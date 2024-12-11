@@ -183,6 +183,10 @@ def load_dataset_master(format, name, dataset_dir):
 
         elif pyg_dataset_id == 'ZINC':
             dataset = preformat_ZINC(dataset_dir, name)
+
+        elif pyg_dataset_id == 'mydata':
+            from lgd.loader.newdataset import preformat_mydata
+            dataset = preformat_mydata(dataset_dir, name)
             
         elif pyg_dataset_id == 'AQSOL':
             dataset = preformat_AQSOL(dataset_dir, name)
