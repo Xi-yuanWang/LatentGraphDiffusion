@@ -102,7 +102,7 @@ encoder:
   pool_vn: False
   # post_pool: True
   prefix_type: add_virtual
-  label_embed_type: for first stage model only
+  label_embed_type: add_virtual
   num_task: 1
   task_type: regression
   # num_classes: only for classification

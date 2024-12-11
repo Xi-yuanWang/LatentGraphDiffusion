@@ -7,6 +7,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch_geometric as pyg
 from torch_geometric.graphgym.register import act_dict, register_layer
+import lgd.encoder.type_dict_encoder
 import torch_geometric.nn as pygnn
 from torch_geometric.data import Batch
 from torch_geometric.nn import Linear as Linear_pyg

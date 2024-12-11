@@ -6,7 +6,7 @@ import torch
 from scipy.stats import stats
 from sklearn.metrics import accuracy_score, precision_score, recall_score, \
     f1_score, roc_auc_score, mean_absolute_error, mean_squared_error, \
-    confusion_matrix
+    confusion_matrix, root_mean_squared_error
 from sklearn.metrics import r2_score
 from torch_geometric.graphgym import get_current_gpu_usage
 from torch_geometric.graphgym.config import cfg
@@ -187,15 +187,15 @@ class CustomLogger(Logger):
         return result
 
     def regression(self):
-        true, pred = torch.cat(self._true), torch.cat(self._pred)
+        true, pred = torch.cat(self._true).cpu(), torch.cat(self._pred).cpu()
         reformat = lambda x: round(float(x), cfg.round)
         return {
             'mae': reformat(mean_absolute_error(true, pred)),
-            'r2': reformat(r2_score(true, pred, multioutput='uniform_average')),
+            'r2': reformat(r2_score(true.numpy(), pred.numpy(), multioutput='uniform_average')),
             'spearmanr': reformat(eval_spearmanr(true.numpy(),
                                                  pred.numpy())['spearmanr']),
             'mse': reformat(mean_squared_error(true, pred)),
-            'rmse': reformat(mean_squared_error(true, pred, squared=False)),
+            'rmse': reformat(root_mean_squared_error(true, pred)),
         }
 
     def update_stats(self, true, pred, loss, lr, time_used, params,

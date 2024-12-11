@@ -53,7 +53,7 @@ def train_epoch(logger, loader, model, optimizer, scheduler, batch_accumulation)
                             loss_edge=loss_edge.detach().cpu().item(),
                             loss_graph=loss_graph.detach().cpu().item(),
                             loss_task=loss_task.detach().cpu().item(),
-                            loss_encoder=loss_encoder.detach().cpu().item(),
+                            loss_encoder=loss_encoder,#.detach().cpu().item(),
                             lr=scheduler.get_last_lr()[0],
                             time_used=time.time() - time_start,
                             params=cfg.params,

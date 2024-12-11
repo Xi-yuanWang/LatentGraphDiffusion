@@ -23,6 +23,18 @@ from torch_geometric.graphgym.model_builder import GraphGymModule, create_model
 from torch_geometric.graphgym.train import GraphGymDataModule, train
 from torch_geometric.graphgym.utils.comp_budget import params_count
 from torch_geometric.graphgym.utils.device import auto_select_device
+import lgd.model.GraphTransformerEncoder
+import lgd.train.pretrain_encoder
+import lgd.config.pretrained_config
+import lgd.config.defaults_config
+import lgd.config.split_config
+import lgd.config.data_preprocess_config
+import lgd.config.pretrained_config
+import lgd.config.data_preprocess_config
+import lgd.config.posenc_config
+import lgd.config.gt_config
+from lgd.config.optimizers_config import extended_optim_cfg
+import lgd.loss.l1
 from torch_geometric.graphgym.register import train_dict, network_dict, register_network, act_dict
 from torch_geometric import seed_everything
 from lgd.asset.logger import create_logger
@@ -253,6 +265,7 @@ if __name__ == '__main__':
     set_cfg(cfg)
     cfg.set_new_allowed(True)
     load_cfg(cfg, args)
+    extended_optim_cfg(cfg)
     # print(cfg)
     custom_set_out_dir(cfg, args.cfg_file, cfg.name_tag)
     dump_cfg(cfg)

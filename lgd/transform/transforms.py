@@ -296,17 +296,17 @@ def pretransform_pe(data, add_virtual_node=False):
             pestat_node.append(getattr(data, pestat_var))
     if data.get('rrwp', None) is not None:
         pestat_node.append(data.rrwp)
-    if pestat_node:
+    if len(pestat_node)>0:
         pestat_node = torch.cat(pestat_node, dim=-1)
         data.pestat_node = pestat_node
     if add_virtual_node:
-        if pestat_node:
+        if len(pestat_node)>0:
             data.pestat_node = torch.cat([data.pestat_node, torch.zeros([1, pestat_node.shape[1]], dtype=torch.float)], dim=0)
 
         for pename in ['rrwp_edge']:
             if data.get(pename, None) is not None:
                 pestat_edge.append(getattr(data, pename))
-        if pestat_edge:
+        if len(pestat_edge)>0:
             pestat_edge = torch.cat(pestat_edge, dim=-1)
             pestat_edge_padded = torch.zeros([(N + 1), (N + 1), pestat_edge.shape[-1]], dtype=torch.float)
             pestat_edge_padded[:N, :N] = pestat_edge.reshape(N, N, -1)
