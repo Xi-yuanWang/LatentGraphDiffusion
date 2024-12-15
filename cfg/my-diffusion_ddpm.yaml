@@ -27,7 +27,7 @@ dataset:
   edge_encoder_name: TypeDictEdge
   edge_encoder_num_types: 2
   edge_encoder_bn: False
-  add_virtual_node_edge: True
+  add_virtual_node_edge: False
   subgraph: False
 train:
   mode: train_diffusion
@@ -105,8 +105,8 @@ encoder:
   pool_edge: True
   pool_vn: False
   post_pool: True
-  prefix_type: add_virtual
-  label_embed_type: add_virtual
+  prefix_type: add_all
+  label_embed_type: add_all
   num_task: 1
   task_type: regression
   # num_classes: only for classification
