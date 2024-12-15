@@ -16,7 +16,6 @@ dataset:
   format: PyG-mydata
   name: subset
   task: graph
-  num_tasks: 1
   task_type: regression
   transductive: False
   node_encoder: True
@@ -54,9 +53,6 @@ model:
   loss_fun: l1
   edge_decoding: dot
   graph_pooling: add
-posenc_RRWP:
-  enable: True
-  ksteps: 20
 encoder:
   type: GraphTransformerEncoder
   in_dim: 36
@@ -104,7 +100,7 @@ encoder:
   pool: add
   pool_edge: True
   pool_vn: False
-  post_pool: True
+  # post_pool: True
   prefix_type: add_all
   label_embed_type: add_all
   num_task: 1
@@ -197,6 +193,16 @@ gnn: # decoder --> san_graph = MLP + pooling
   dropout: 0.0
   agg: mean
   normalize_adj: False
+posenc_RWSE:
+  enable: False
+  kernel:
+    times_func: range(1,21)
+  model: Linear
+  dim_pe: 28
+  raw_norm_type: BatchNorm
+posenc_RRWP:
+  enable: True
+  ksteps: 20
 optim:
   clip_grad_norm: True
   optimizer: adamW
