@@ -30,6 +30,8 @@ from lgd.model.GraphTransformerEncoder import *
 from lgd.model.SyntheticGraphTransformerEncoder import *
 from lgd.model.DenoisingTransformer import DenoisingTransformer
 
+from lgd.model.DenoisingHOGNN import DenoisingHOGNN
+
 
 def disabled_train(self, mode=True):
     """Overwrite model.train with this function to make sure train/eval mode
@@ -1446,8 +1448,15 @@ class LatentDiffusion(DDPM):
             generic_graphs = []
             accumulated_node, accumulated_edge = 0, 0
             for i in range(batch.num_graphs):
+                # torch.set_printoptions(threshold=torch.inf)
+                # with open("debug.txt", "a") as f:
+                #     f.write(f"edge_decode: {edge_decode}\n")
+                # print(f"edge_decode: {edge_decode}\n")
                 adj = torch.argmax(edge_decode[accumulated_edge: accumulated_edge + batch.num_node_per_graph[i] ** 2], dim=1, keepdim=False)\
                       .reshape(batch.num_node_per_graph[i], batch.num_node_per_graph[i]).detach().cpu().numpy()
+                # with open("debug.txt", "a") as f:
+                #     f.write(f"adjacency matrix: {adj}\n")
+                # print(f"adjacency matrix: {adj}\n")
                 G = nx.from_numpy_array(adj)
                 G.remove_edges_from(nx.selfloop_edges(G))
                 G.remove_nodes_from(list(nx.isolates(G)))
@@ -1500,7 +1509,11 @@ class DiffusionWrapper(pl.LightningModule):
     def __init__(self, diff_model_config, conditioning_key):
         super().__init__()
         # self.diffusion_model = instantiate_from_config(diff_model_config)
-        self.diffusion_model = DenoisingTransformer(cfg)
+        if cfg.model.diffusion_model == 'DenoisingTransformer':
+            self.diffusion_model = DenoisingTransformer(cfg)
+        elif cfg.model.diffusion_model == 'DenoisingHOGNN':
+            self.diffusion_model = DenoisingHOGNN(cfg)
+        # self.diffusion_model = DenoisingHOGNN()
         self.conditioning_key = conditioning_key
         assert self.conditioning_key in [None, 'concat', 'crossattn', 'hybrid', 'adm']
 

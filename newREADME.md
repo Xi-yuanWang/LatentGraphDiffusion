@@ -35,3 +35,17 @@ python train_diffusion.py --cfg cfg/my-diffusion_ddpm.yaml --repeat 5 wandb.use 
     1. dataset.format改为Pyg-数据集名称
     2. node_encoder_num_types, edge_encoder_num_types 点，边特征的最大种类数
     3. cfg/my-diffusion_ddpm.yaml的first_stage_config改为encoder的ckpt路径
+
+run command: python inference.py --cfg cfg/my-diffusion_ddpm_pretrained.yaml
+
+训练encoder的code: python pretrain.py --cfg cfg/hognn-encoder.yaml --repeat 5 wandb.use False
+训练diffusion的code: python train_diffusion.py --cfg cfg/my-diffusion_ddpm.yaml --repeat 5 wandb.use False
+inference的code: python inference.py --cfg cfg/my-diffusion_ddpm_pretrained.yaml，跟my-diffusion_ddpm.yaml基本一样，区别就是在最后加三行pretrained，更改model.loss_fun为mse，更改train.mode为generic_generation，如my-diffusion_ddpm_pretrained.yaml所示。
+
+在训练diffusion的cfg中，更改model.diffusion_model（“DenoisingTransformer”/“DenoisingHOGNN”）可以调整score network。如果使用hognn，需要在cfg中单独设置hognn的参数，如my-diffusion_ddpm.yaml所示。
+
+在训练encoder的cfg中，更改model.type（“GraphTransformerEncoder”/“HOGNNEncoder”）可以调整encoder。如果使用hognn，需要在encoder.subgnn中设置type和num_layers参数（c_dim不用管），如hognn-encoder.yaml所示。
+
+DenoisingHOGNN和HOGNNEncoder的code见lgd.model中的.py文件
+
+mydata数据集我设置了两种，他们的format分别是PyG-mydata128和PyG-mydata1000，分别对应不同长度的dataset，更改dataset.format即可使用。
