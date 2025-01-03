@@ -12,9 +12,9 @@ mlflow:
   name: mydata-GRIT-RRWP
 wandb:
   use: False
-  project: mydata
+  project: six_cycle_128
 dataset:
-  format: PyG-mydata
+  format: PyG-mydata128
   name: subset
   task: graph
   task_type: regression

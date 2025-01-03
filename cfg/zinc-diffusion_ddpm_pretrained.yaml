@@ -1,3 +1,4 @@
+# Original:  zinc-GRIT-2000.yaml
 out_dir: results
 metric_best: mae
 metric_agg: argmin
@@ -8,28 +9,29 @@ accelerator: "cuda:0"
 mlflow:
   use: False
   project: Exp
-  name: mydata-GRIT-RRWP
+  name: zinc-GRIT-RRWP
 wandb:
   use: False
-  project: mydata
+  project: ZINC
 dataset:
-  format: PyG-mydata128
+  format: PyG-ZINC
   name: subset
   task: graph
+  num_tasks: 1
   task_type: regression
   transductive: False
   node_encoder: True
   node_encoder_name: TypeDictNode
-  node_encoder_num_types: 2
+  node_encoder_num_types: 21 # actually 21 in Zinc-12k, 28 in Zinc-full
   node_encoder_bn: False
   edge_encoder: True
   edge_encoder_name: TypeDictEdge
-  edge_encoder_num_types: 2
+  edge_encoder_num_types: 4
   edge_encoder_bn: False
-  add_virtual_node_edge: False
+  add_virtual_node_edge: True
   subgraph: False
 train:
-  mode: train_diffusion
+  mode: generic_generation
   batch_size: 256
   eval_period: 50
   start_eval_epoch: -1
@@ -41,19 +43,21 @@ train:
   pretrain:
     mask_node_prob: 0.0
     mask_edge_prob: 0.0
-    mask_label_prob: 0.0
-    recon: all
-    original_task: False
-    input_target: False
-    node_factor: 1.0
-    edge_factor: 1.0
-    graph_factor: 0.0
+    mask_label_prob: 0.5
+    recon: none
+    original_task: True
+    input_target: True
+    node_factor: 0.0
+    edge_factor: 0.0
+    graph_factor: 1.0
 model:
   type: LatentDiffusion
-  loss_fun: l1
+  loss_fun: mse
   edge_decoding: dot
   graph_pooling: add
-  diffusion_model: DenoisingHOGNN
+posenc_RRWP:
+  enable: True
+  ksteps: 20
 encoder:
   type: GraphTransformerEncoder
   in_dim: 36
@@ -101,19 +105,19 @@ encoder:
   pool: add
   pool_edge: True
   pool_vn: False
-  # post_pool: True
-  prefix_type: add_all
-  label_embed_type: add_all
+  post_pool: True
+  prefix_type: add_virtual
+  label_embed_type: add_virtual
   num_task: 1
   task_type: regression
   # num_classes: only for classification
   node_encoder: True
   node_encoder_name: TypeDictNode
-  node_encoder_num_types: 2
+  node_encoder_num_types: 21 # actually 21 in Zinc-12k, 28 in Zinc-full
   node_encoder_bn: False
   edge_encoder: True
   edge_encoder_name: TypeDictEdge
-  edge_encoder_num_types: 2
+  edge_encoder_num_types: 4
   edge_encoder_bn: False
 dt:
   in_dim: 4  # should be the same as encoder.out_dim
@@ -155,18 +159,11 @@ dt:
   pool_vn: False
   post_pool: True
   condition_list: ['masked_graph']
-hognn:
-  in_dim: 4  # should be the same as encoder.out_dim
-  hid_dim: 64
-  out_dim: 4
-  num_layers: 6
-  act: 'relu'
-  type: 'PPGN'
 diffusion:
   conditioning_key: crossattn
   hid_dim: 4  # should be the same as dt.in_dim
   cond_stage_key: masked_graph
-  first_stage_config: results/my-encoder_128/2/ckpt/1999.ckpt
+  first_stage_config: results/zinc-encoder/0/ckpt/1999.ckpt
   cond_stage_config: __is_first_stage__
   node_factor: 1.0
   edge_factor: 1.0
@@ -201,16 +198,6 @@ gnn: # decoder --> san_graph = MLP + pooling
   dropout: 0.0
   agg: mean
   normalize_adj: False
-posenc_RWSE:
-  enable: False
-  kernel:
-    times_func: range(1,21)
-  model: Linear
-  dim_pe: 28
-  raw_norm_type: BatchNorm
-posenc_RRWP:
-  enable: True
-  ksteps: 20
 optim:
   clip_grad_norm: True
   optimizer: adamW
@@ -220,3 +207,7 @@ optim:
   num_warmup_epochs: 50
   scheduler: cosine_with_warmup
   min_lr: 1e-6
+pretrained:
+  dir: results/zinc-diffusion_ddpm/0/ckpt/149.ckpt
+  freeze_main: True
+  reset_prediction_head: False
