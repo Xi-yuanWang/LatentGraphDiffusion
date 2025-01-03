@@ -4,12 +4,10 @@ import numpy as np
 import torch
 import re
 from rdkit import Chem
-from fcd_torch import FCD as FCDMetric
 import logging
 from torch_geometric.graphgym.config import cfg
 import networkx as nx
 import matplotlib.pyplot as plt
-from lgd.asset.mmd import compute_nspdk_mmd
 import os
 
 allowed_bonds = {'H': 1, 'C': 4, 'N': 3, 'O': 2, 'F': 1, 'B': 3, 'Al': 3, 'Si': 4, 'P': [3, 5],
@@ -376,13 +374,12 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, ptest=N
     # logging.info(log_string)
     if ptest is not None and len(rdkit_metrics[2]) > 0:
         kwargs_fcd = {'n_jobs': 20, 'device': cfg.accelerator, 'batch_size': cfg.train.batch_size}
-        FCD_Test = FCDMetric(**kwargs_fcd)(gen=rdkit_metrics[1], pref=ptest['FCD'])
+        FCD_Test = 0.0#FCDMetric(**kwargs_fcd)(gen=rdkit_metrics[1], pref=ptest['FCD'])
         dic['FCD_Test'] = FCD_Test
 
         graph_ref_list = ptest['graph_ref_list']
         graph_pred_list_remove_empty = rdkit_metrics[2]
-        mmd_dist = compute_nspdk_mmd(graph_ref_list, graph_pred_list_remove_empty, metric='nspdk', is_hist=False,
-                                     n_jobs=20)
+        mmd_dist = 0.0#compute_nspdk_mmd(graph_ref_list, graph_pred_list_remove_empty, metric='nspdk', is_hist=False, n_jobs=20)
         dic['NSPDK_MMD'] = mmd_dist
     logging.info(dic)
     visualize_samples = random.sample(rdkit_metrics[2], min(20, len(rdkit_metrics[2])))

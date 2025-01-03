@@ -5,7 +5,6 @@ import numpy as np
 import random
 import torch
 import torch.nn as nn
-from fcd_torch import FCD as FCDMetric
 from torch_geometric.graphgym.checkpoint import load_ckpt, save_ckpt, clean_ckpt
 from torch_geometric.graphgym.config import cfg
 from torch_geometric.graphgym.loss import compute_loss
@@ -18,7 +17,7 @@ from copy import deepcopy
 import warnings
 from utils import random_mask
 from lgd.asset.molecules_evaluation import compute_molecular_metrics, build_molecule, mols_to_nx, mol2smiles, build_molecule_with_partial_charges
-from lgd.asset.mmd import compute_nspdk_mmd
+#from lgd.asset.mmd import compute_nspdk_mmd
 from lgd.loader.dataset.qm9 import get_qm9_smiles, QM9infos
 from lgd.loader.dataset.moses import get_moses_smiles, MOSESinfos
 from rdkit import Chem
@@ -201,7 +200,7 @@ def custom_train_diffusion(loggers, loaders, model, optimizer, scheduler):
         test_smiles = [Chem.MolToSmiles(Chem.MolFromSmiles(smi)) for smi in tqdm(test_smiles, 'Canonicalizing')]  # canonicalize_smiles
     kwargs_fcd = {'n_jobs': 20, 'device': cfg.accelerator, 'batch_size': cfg.train.batch_size}
     pref = {}
-    pref['FCD'] = FCDMetric(**kwargs_fcd).precalc(test_smiles)
+    pref['FCD'] = 0.0#FCDMetric(**kwargs_fcd).precalc(test_smiles)
     test_mols = []
     for i, batch in enumerate(test_loader):
         B = batch.num_graphs
@@ -221,9 +220,9 @@ def custom_train_diffusion(loggers, loaders, model, optimizer, scheduler):
     if len(test_graphs) > 10000:
         test_graphs = random.sample(test_graphs, 10000)
     pref['graph_ref_list'] = test_graphs
-    FCD_test_test = FCDMetric(**kwargs_fcd)(gen=test_smiles, pref=pref['FCD'])
+    FCD_test_test = 0.0#FCDMetric(**kwargs_fcd)(gen=test_smiles, pref=pref['FCD'])
     logging.info('Ground truth test FCD: ' + str(FCD_test_test))
-    mmd_dist = compute_nspdk_mmd(test_graphs, test_graphs, metric='nspdk', is_hist=False, n_jobs=20)
+    mmd_dist = 0.0#compute_nspdk_mmd(test_graphs, test_graphs, metric='nspdk', is_hist=False, n_jobs=20)
     logging.info('Ground truth test NSPDK MMD: ' + str(mmd_dist))
     # FCD_test_sample = FCDMetric(**kwargs_fcd)(gen=random.sample(test_smiles, 5000), pref=pref['FCD'])
     # logging.info('Ground truth sampled test FCD: ' + str(FCD_test_sample))

@@ -25,6 +25,7 @@ import lgd.model.GraphTransformerEncoder
 import lgd.model.DenoisingTransformer
 import lgd.train.pretrain_encoder
 import lgd.train.train_diffusion
+import lgd.train.qm9_generation
 import lgd.config.pretrained_config
 import lgd.config.defaults_config
 import lgd.config.split_config

@@ -16,7 +16,6 @@ import logging
 
 from lgd.loader.dataset.abstract_dataset import AbstractDatasetInfos  #, MolecularDataModule
 from lgd.asset.molecules_evaluation import mol2smiles, build_molecule_with_partial_charges
-from lgd.asset.molecules_evaluation import compute_molecular_metrics
 from lgd.model.utils import num2batch
 
 
@@ -97,7 +96,7 @@ class QM9Dataset(InMemoryDataset):
         """
         Download raw qm9 files. Taken from PyG QM9 class
         """
-        try:
+        if False:
             import rdkit  # noqa
             file_path = download_url(self.raw_url, self.raw_dir)
             extract_zip(file_path, self.raw_dir)
@@ -106,7 +105,7 @@ class QM9Dataset(InMemoryDataset):
             file_path = download_url(self.raw_url2, self.raw_dir)
             os.rename(osp.join(self.raw_dir, '3195404'),
                       osp.join(self.raw_dir, 'uncharacterized.txt'))
-        except ImportError:
+        else:#except ImportError:
             path = download_url(self.processed_url, self.raw_dir)
             extract_zip(path, self.raw_dir)
             os.unlink(path)
@@ -137,14 +136,12 @@ class QM9Dataset(InMemoryDataset):
         target_df = pd.read_csv(self.split_paths[self.file_idx], index_col=0)
         target_df.drop(columns=['mol_id'], inplace=True)
 
-        with open(self.raw_paths[-1], 'r') as f:
-            skip = [int(x.split()[0]) - 1 for x in f.read().split('\n')[9:-2]]
-
+       
         suppl = Chem.SDMolSupplier(self.raw_paths[0], removeHs=False, sanitize=False)
 
         data_list = []
         for i, mol in enumerate(tqdm(suppl)):
-            if i in skip or i not in target_df.index:
+            if i not in target_df.index:
                 continue
 
             N = mol.GetNumAtoms()
