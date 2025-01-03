@@ -231,7 +231,7 @@ def custom_train_diffusion(loggers, loaders, model, optimizer, scheduler):
     # visualize test graphs
     save_path = os.path.join(cfg.run_dir, 'generated_molecules')
     os.makedirs(save_path, exist_ok=True)
-    for i in range(50):
+    for i in range(5):
         G = test_graphs[i]
         logging.info(G)
         labels = nx.get_node_attributes(G, 'label')

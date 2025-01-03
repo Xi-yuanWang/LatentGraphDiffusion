@@ -14,7 +14,7 @@ wandb:
   use: False
   project: six_cycle_128
 dataset:
-  format: PyG-mydata128
+  format: PyG-mydata
   name: subset
   task: graph
   task_type: regression
@@ -34,7 +34,7 @@ train:
   batch_size: 64
   eval_period: 1
   enable_ckpt: True  # Checkpointing can now be disabled to save I/O when e.g. just benchmarking.
-  ckpt_best: True  # WARNING: Checkpoint every epoch a better model is found may increase I/O significantly.
+  ckpt_best: False  # WARNING: Checkpoint every epoch a better model is found may increase I/O significantly.
   ckpt_clean: False # Do not delete old ckpt each time.
   ckpt_period: 25
   ensemble_repeat: 1
@@ -50,24 +50,28 @@ train:
     edge_factor: 1.0
     graph_factor: 0.0
 model:
-  type: HOGNNEncoder
+  type: GraphTransformerStructureEncoder
   loss_fun: l1
   edge_decoding: dot
   graph_pooling: add
+posenc_RRWP:
+  enable: True
+  ksteps: 16
 encoder:
-  in_dim: 64
-  prefix_dim: 64
-  posenc_in_dim: 0
-  posenc_in_dim_edge: 20
-  posenc_dim: 28
+  model_type: GraphTransformerStructureEncoder
+  in_dim: 48
+  prefix_dim: 96
+  posenc_in_dim: 16
+  posenc_in_dim_edge: 16
+  posenc_dim: 48
   pe_raw_norm: None
-  hid_dim: 64
-  out_dim: 4
+  hid_dim: 96
+  out_dim: 32
   use_time: False
   temb_dim: 0
   num_heads: 4
-  num_layers: 10
-  dropout: 0.0
+  num_layers: 5
+  dropout: 0.2
   attn_dropout: 0.5
   attn:
     clamp: 5.
@@ -81,12 +85,12 @@ encoder:
     score_act: True
     deg_scaler: False
     attn_product: mul
-    attn_reweight: True
-    edge_reweight: True
+    attn_reweight: False
+    edge_reweight: False
   mpnn:
     enable: True
     act: 'relu'
-    dropout: 0.0
+    dropout: 0.2
     edge_enhance: True
     project_edge: True
   residual: True
@@ -95,12 +99,14 @@ encoder:
   act: 'relu'
   norm_e: True
   O_e: True
-  ff_e: False
+  ff_e: True
   update_e: True
-  pool: add
+  force_undirected: True
+  pool: mean
   pool_edge: True
   pool_vn: False
-  # post_pool: True
+  post_pool: False
+  final_norm: True
   prefix_type: add_all
   label_embed_type: add_all
   num_task: 1
@@ -114,10 +120,7 @@ encoder:
   edge_encoder_name: TypeDictEdge
   edge_encoder_num_types: 2
   edge_encoder_bn: False
-  subgnn:
-    type: 'PPGN'
-    num_layers: 6
-    c_hid: 4
+  add_virtual_node_edge: False
 gt:
   layer_type: GritTransformer
   layers: 10
@@ -155,7 +158,7 @@ posenc_RWSE:
   dim_pe: 28
   raw_norm_type: BatchNorm
 posenc_RRWP:
-  enable: True
+  enable: False
   ksteps: 20
 optim:
   clip_grad_norm: True
