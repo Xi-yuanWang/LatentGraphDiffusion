@@ -382,6 +382,6 @@ def compute_molecular_metrics(molecule_list, train_smiles, dataset_info, ptest=N
         mmd_dist = 0.0#compute_nspdk_mmd(graph_ref_list, graph_pred_list_remove_empty, metric='nspdk', is_hist=False, n_jobs=20)
         dic['NSPDK_MMD'] = mmd_dist
     logging.info(dic)
-    visualize_samples = random.sample(rdkit_metrics[2], min(20, len(rdkit_metrics[2])))
+    visualize_samples = rdkit_metrics[2] #random.sample(rdkit_metrics[2], min(20, len(rdkit_metrics[2])))
 
     return validity_dict, rdkit_metrics, all_smiles, dic, visualize_samples

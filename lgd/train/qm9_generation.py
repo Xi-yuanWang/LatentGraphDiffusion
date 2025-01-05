@@ -131,13 +131,22 @@ def eval_epoch(logger, loader, model, split='val', repeat=1, ensemble_mode='none
     if evaluate:
         if len(generated_mol) > 10000:
             generated_mol = random.sample(generated_mol, 10000)
-        validity_dict, rdkit_metrics, all_smiles, dic, visualize_samples = compute_molecular_metrics(generated_mol, train_smiles, dataset_info, pref)
+        #validity_dict, rdkit_metrics, all_smiles, dic, visualize_samples = compute_molecular_metrics(generated_mol, train_smiles, dataset_info, pref)
         # visualize generated molecules
         save_path = os.path.join(cfg.run_dir, 'generated_molecules')
         os.makedirs(save_path, exist_ok=True)
 
-        for i in range(len(visualize_samples)):
-            G = visualize_samples[i]
+        for i, graph in enumerate(generated_mol):
+            atom_types, edge_types, graph_feature = graph
+            G = nx.from_numpy_array((edge_types>0).cpu().numpy())
+            pos = nx.spring_layout(G)
+            nx.draw(G, pos)
+            #nx.draw_networkx_labels(G, pos)
+            #nx.draw_networkx_edge_labels(G, pos)
+            plt.savefig(save_path + '/epoch_' + str(current_epoch) + '_sample_' + str(i) + '.png')
+            plt.clf()
+            
+            '''
             logging.info(G)
             labels = nx.get_node_attributes(G, 'label')
             pos = nx.spring_layout(G)
@@ -146,6 +155,7 @@ def eval_epoch(logger, loader, model, split='val', repeat=1, ensemble_mode='none
             nx.draw_networkx_edge_labels(G, pos)
             plt.savefig(save_path + '/epoch_' + str(current_epoch) + '_sample_' + str(i) + '.png')
             plt.clf()
+            '''
 
 
 @register_train('qm9_unconditional')
@@ -195,9 +205,9 @@ def custom_train_diffusion(loggers, loaders, model, optimizer, scheduler):
         test_smiles = [Chem.MolToSmiles(Chem.MolFromSmiles(smi)) for smi in tqdm(test_smiles, 'Canonicalizing')]  # canonicalize_smiles
     else: # qm9
         infos = QM9infos(cfg)
-        train_smiles = get_qm9_smiles(cfg, train_loader, infos, evaluate_dataset=False)
-        test_smiles = get_qm9_smiles(cfg, test_loader, infos, evaluate_dataset=False, test_set=True)
-        test_smiles = [Chem.MolToSmiles(Chem.MolFromSmiles(smi)) for smi in tqdm(test_smiles, 'Canonicalizing')]  # canonicalize_smiles
+        train_smiles = None#= get_qm9_smiles(cfg, train_loader, infos, evaluate_dataset=False)
+        test_smiles = None #= get_qm9_smiles(cfg, test_loader, infos, evaluate_dataset=False, test_set=True)
+        test_smiles =  None #= [Chem.MolToSmiles(Chem.MolFromSmiles(smi)) for smi in tqdm(test_smiles, 'Canonicalizing')]  # canonicalize_smiles
     kwargs_fcd = {'n_jobs': 20, 'device': cfg.accelerator, 'batch_size': cfg.train.batch_size}
     pref = {}
     pref['FCD'] = 0.0#FCDMetric(**kwargs_fcd).precalc(test_smiles)
