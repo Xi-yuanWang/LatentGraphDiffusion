@@ -163,7 +163,7 @@ diffusion:
   conditioning_key: crossattn
   hid_dim: 4  # should be the same as dt.in_dim
   cond_stage_key: masked_graph
-  first_stage_config: results/zinc-encoder/0/ckpt/0.ckpt
+  first_stage_config: results/zinc-encoder/0/ckpt/1999.ckpt
   cond_stage_config: __is_first_stage__
   node_factor: 1.0
   edge_factor: 1.0

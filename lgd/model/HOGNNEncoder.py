@@ -83,6 +83,9 @@ class HOGNNEncoder(nn.Module):
         self.in_dim = cfg.in_dim
         self.hid_dim = cfg.hid_dim
         self.out_dim = cfg.out_dim
+        self.posenc_in_dim = cfg.posenc_in_dim
+        self.posenc_in_dim_edge = cfg.posenc_in_dim_edge
+        self.posenc_dim = cfg.posenc_dim
         self.subgnn_type = cfg.subgnn.type
         self.act = act_dict[cfg.act]() if cfg.act is not None else nn.Identity()
         
@@ -102,7 +105,30 @@ class HOGNNEncoder(nn.Module):
         else:
             EdgeEncoder = register.edge_encoder_dict[cfg.edge_encoder_name]
             self.edge_emb = EdgeEncoder(self.in_dim) # embedding dim = 64
-            
+        
+        if self.posenc_in_dim > 0 and self.posenc_dim > 0:
+            if cfg.get('pe_raw_norm', None) == 'BatchNorm':
+                pe_raw_norm_node = nn.BatchNorm1d(self.posenc_in_dim, track_running_stats=not self.bn_no_runner,
+                                                  eps=1e-5, momentum=self.bn_momentum)
+            elif cfg.get('pe_raw_norm', None) == 'LayerNorm':
+                pe_raw_norm_node = nn.LayerNorm(self.posenc_in_dim)
+            else:
+                pe_raw_norm_node = nn.Identity()
+            self.posenc_emb = nn.Sequential(pe_raw_norm_node, nn.Linear(self.posenc_in_dim, self.posenc_dim))
+            # self.posenc_emb = nn.Sequential(pe_raw_norm_node, nn.Linear(self.posenc_in_dim, 2 * self.posenc_dim), self.act,
+            #                                 nn.Linear(2 * self.posenc_dim, self.posenc_dim))
+        if self.posenc_in_dim_edge > 0 and self.posenc_dim > 0:
+            if cfg.get('pe_raw_norm', None) == 'BatchNorm':
+                pe_raw_norm_edge = nn.BatchNorm1d(self.posenc_in_dim_edge, track_running_stats=not self.bn_no_runner,
+                                                  eps=1e-5, momentum=self.bn_momentum)
+            elif cfg.get('pe_raw_norm', None) == 'LayerNorm':
+                pe_raw_norm_edge = nn.LayerNorm(self.posenc_in_dim_edge)
+            else:
+                pe_raw_norm_edge = nn.Identity()
+            # self.posenc_emb_edge = nn.Sequential(pe_raw_norm_edge, nn.Linear(self.posenc_in_dim_edge, 2 * self.posenc_dim), self.act,
+            #                                      nn.Linear(2 * self.posenc_dim, self.posenc_dim))
+            self.posenc_emb_edge = nn.Sequential(pe_raw_norm_edge, nn.Linear(self.posenc_in_dim_edge, self.posenc_dim))
+
         self.node_in_mlp = nn.Sequential(nn.Linear(self.hid_dim, 2 * self.hid_dim), self.act,
                                          nn.Linear(2 * self.hid_dim, self.hid_dim))
         self.edge_in_mlp = nn.Sequential(nn.Linear(self.hid_dim, 2 * self.hid_dim), self.act,
@@ -129,15 +155,30 @@ class HOGNNEncoder(nn.Module):
         batch.batch_node_idx, batch.batch_edge_idx = batch_node_idx, batch_edge_idx
         num_nodes, num_edges = batch.num_nodes, batch.edge_index.shape[1]
         
-        batch.x = self.node_emb(batch.x).reshape(num_nodes, -1) # ? -> 64
-        batch.edge_attr = self.edge_emb(batch.edge_attr).reshape(num_edges, -1) # ? -> 64
+        h = self.node_emb(batch.x).reshape(num_nodes, -1) # ? -> 64
+        e = self.edge_emb(batch.edge_attr).reshape(num_edges, -1) # ? -> 64
         
-        batch.x = self.node_in_mlp(batch.x) # 64 -> 64
-        batch.edge_attr = self.edge_in_mlp(batch.edge_attr) # 64 -> 64
+        if self.posenc_dim > 0:
+            if self.posenc_in_dim > 0 and batch.get("pestat_node", None) is not None:
+                batch_posenc_emb = self.posenc_emb(batch.pestat_node)
+            else:
+                batch_posenc_emb = torch.zeros([num_nodes, self.posenc_dim], dtype=torch.float, device=batch.x.device)
+            if self.posenc_in_dim_edge > 0 and batch.get("pestat_edge", None) is not None:
+                batch_posenc_emb_edge = self.posenc_emb_edge(batch.pestat_edge)
+            else:
+                batch_posenc_emb_edge = torch.zeros([num_edges, self.posenc_dim], dtype=torch.float, device=batch.x.device)
+            # h = torch.cat([h, prefix_h, batch_posenc_emb], dim=1)
+            # e = torch.cat([e, prefix_e, batch_posenc_edge], dim=1)
+            h = torch.cat([h, batch_posenc_emb], dim=1)
+            e = torch.cat([e, batch_posenc_emb_edge], dim=1)
+            
+        
+        h = self.node_in_mlp(h) # 64 -> 64
+        e = self.edge_in_mlp(e) # 64 -> 64
         
         # print(f"GRAPH ATTRIBUTE AT THE BEGINNING: {batch.graph_attr}")
-        x, mask = to_dense_batch(batch.x, batch.batch) # mask是一个num_graphs(B)×num_nodes_per_graph(N)的矩阵，如果x里面有些node_representation是pooling的结果，这些位置就会在mask中被标记为False，表示占位值
-        adj = to_dense_adj(batch.edge_index, batch.batch, batch.edge_attr)
+        x, mask = to_dense_batch(h, batch.batch) # mask是一个num_graphs(B)×num_nodes_per_graph(N)的矩阵，如果x里面有些node_representation是pooling的结果，这些位置就会在mask中被标记为False，表示占位值
+        adj = to_dense_adj(batch.edge_index, batch.batch, e)
         
         if t is not None:
             adj = adj * self.temb(t.to(device=adj.device, dtype=adj.dtype).reshape(-1, 1, 1, 1))
@@ -152,17 +193,17 @@ class HOGNNEncoder(nn.Module):
 
         X = X + X.transpose(1, 2)
         
-        batch.edge_attr = torch.empty(batch.edge_attr.shape).to("cuda")
+        e = torch.empty(e.shape).to("cuda")
         for edge_idx in range(batch.edge_index.shape[1]):
             from_node = batch.edge_index[0][edge_idx]
             to_node = batch.edge_index[1][edge_idx]
             from_node_idx = from_node - get_first_node(batch, batch.batch[from_node])
             to_node_idx = to_node - get_first_node(batch, batch.batch[to_node])
-            batch.edge_attr[edge_idx] = X[batch.batch[from_node]][from_node_idx][to_node_idx] # 这里index batch用的index应该用from_node和to_node都行
+            e[edge_idx] = X[batch.batch[from_node]][from_node_idx][to_node_idx] # 这里index batch用的index应该用from_node和to_node都行
             
-        batch.x = self.mlp(X).mean(dim=-2)[mask] # (B, N, N, d) -> (B, N, d)
-        batch.x = self.final_layer_node(batch.x)
-        batch.edge_attr = self.final_layer_node(batch.edge_attr)
+        h = self.mlp(X).mean(dim=-2)[mask] # (B, N, N, d) -> (B, N, d)
+        batch.x = self.final_layer_node(h)
+        batch.edge_attr = self.final_layer_node(e)
         batch.graph_attr = global_mean_pool(batch.x, batch.batch)
         # print(f"graph_attr.shape: {batch.graph_attr.shape}")
         return batch

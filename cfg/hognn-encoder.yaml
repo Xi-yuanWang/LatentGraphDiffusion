@@ -5,7 +5,7 @@ metric_agg: argmin
 tensorboard_each_run: False  # Log to Tensorboard each run
 #accelerator: "cuda:3"
 #device: "cuda:3"
-accelerator: "cuda:0"
+accelerator: "cuda:1"
 mlflow:
   use: False
   project: Exp
@@ -14,7 +14,7 @@ wandb:
   use: False
   project: six_cycle_128
 dataset:
-  format: PyG-mydata
+  format: PyG-mydata1000
   name: subset
   task: graph
   task_type: regression
@@ -50,7 +50,7 @@ train:
     edge_factor: 1.0
     graph_factor: 0.0
 model:
-  type: GraphTransformerStructureEncoder
+  type: HOGNNEncoder
   loss_fun: l1
   edge_decoding: dot
   graph_pooling: add
@@ -58,7 +58,7 @@ posenc_RRWP:
   enable: True
   ksteps: 16
 encoder:
-  model_type: GraphTransformerStructureEncoder
+  model_type: HOGNNEncoder
   in_dim: 48
   prefix_dim: 96
   posenc_in_dim: 16
@@ -121,6 +121,10 @@ encoder:
   edge_encoder_num_types: 2
   edge_encoder_bn: False
   add_virtual_node_edge: False
+  subgnn:
+    type: 'PPGN'
+    num_layers: 6
+    c_hid: 4
 gt:
   layer_type: GritTransformer
   layers: 10

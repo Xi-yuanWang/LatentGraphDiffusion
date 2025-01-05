@@ -11,7 +11,7 @@ mlflow:
   name: mydata-GRIT-RRWP
 wandb:
   use: False
-  project: six_cycle_1000
+  project: mydata
 dataset:
   format: PyG-mydata1000
   name: subset
@@ -28,14 +28,17 @@ dataset:
   edge_encoder_bn: False
   add_virtual_node_edge: False
   subgraph: False
+  remove_h: False
 train:
-  mode: train_diffusion
-  batch_size: 128
-  eval_period: 50
+  mode: qm9_unconditional
+  batch_size: 64
+  eval_batch_size: 2048
+  eval_period: 1
   start_eval_epoch: -1
   enable_ckpt: True  # Checkpointing can now be disabled to save I/O when e.g. just benchmarking.
-  ckpt_best: True  # WARNING: Checkpoint every epoch a better model is found may increase I/O significantly.
+  ckpt_best: False  # WARNING: Checkpoint every epoch a better model is found may increase I/O significantly.
   ckpt_clean: False # Delete old ckpt each time.
+  ckpt_period: 25
   ensemble_repeat: 1
   ensemble_mode: none
   pretrain:
@@ -54,21 +57,24 @@ model:
   edge_decoding: dot
   graph_pooling: add
   diffusion_model: DenoisingTransformer
+posenc_RRWP:
+  enable: True
+  ksteps: 16
 encoder:
-  type: GraphTransformerEncoder
-  in_dim: 36
-  prefix_dim: 64
-  posenc_in_dim: 20
-  posenc_in_dim_edge: 20
-  posenc_dim: 28
+  model_type: GraphTransformerStructureEncoder
+  in_dim: 48
+  prefix_dim: 96
+  posenc_in_dim: 16
+  posenc_in_dim_edge: 16
+  posenc_dim: 48
   pe_raw_norm: None
-  hid_dim: 64
-  out_dim: 4
+  hid_dim: 96
+  out_dim: 32
   use_time: False
   temb_dim: 0
   num_heads: 4
-  num_layers: 10
-  dropout: 0.0
+  num_layers: 5
+  dropout: 0.2
   attn_dropout: 0.5
   attn:
     clamp: 5.
@@ -82,12 +88,12 @@ encoder:
     score_act: True
     deg_scaler: False
     attn_product: mul
-    attn_reweight: True
-    edge_reweight: True
+    attn_reweight: False
+    edge_reweight: False
   mpnn:
     enable: True
     act: 'relu'
-    dropout: 0.0
+    dropout: 0.2
     edge_enhance: True
     project_edge: True
   residual: True
@@ -96,12 +102,14 @@ encoder:
   act: 'relu'
   norm_e: True
   O_e: True
-  ff_e: False
+  ff_e: True
   update_e: True
-  pool: add
+  force_undirected: True
+  pool: mean
   pool_edge: True
   pool_vn: False
-  # post_pool: True
+  post_pool: False
+  final_norm: True
   prefix_type: add_all
   label_embed_type: add_all
   num_task: 1
@@ -115,21 +123,22 @@ encoder:
   edge_encoder_name: TypeDictEdge
   edge_encoder_num_types: 2
   edge_encoder_bn: False
+  add_virtual_node_edge: False
 dt:
-  in_dim: 4  # should be the same as encoder.out_dim
-  hid_dim: 64
-  out_dim: 4
+  in_dim: 32  # should be the same as encoder.out_dim
+  hid_dim: 256
+  out_dim: 32
   use_time: True
-  temb_dim: 64
-  cond_dim: 4
-  num_heads: 8
-  num_layers: 4
+  temb_dim: 128
+  cond_dim: 16
+  num_heads: 16
+  num_layers: 8
   self_attn: True
   dropout: 0.05
-  attn_dropout: 0.25
+  attn_dropout: 0.1
   residual: True
-  layer_norm: True
-  batch_norm: False
+  layer_norm: False
+  batch_norm: True
   act: 'relu'
   attn:
     clamp: 5.
@@ -147,24 +156,30 @@ dt:
     edge_reweight: False
   norm_e: True
   O_e: True
-  ff_e: False
+  ff_e: True
   ff_e_ca: True
-  ff_e_sa: False
-  pool: add
+  ff_e_sa: True
+  update_e: True
+  force_undirected: True
+  pool: mean
   pool_edge: True
   pool_vn: False
-  post_pool: True
-  condition_list: ['masked_graph']
+  post_pool: False
+  final_norm: True
+  condition_list: ['unconditional']
 diffusion:
   conditioning_key: crossattn
-  hid_dim: 4  # should be the same as dt.in_dim
-  cond_stage_key: masked_graph
-  first_stage_config: results/my-encoder_1000/2/ckpt/1999.ckpt
-  cond_stage_config: __is_first_stage__
+  hid_dim: 32  # should be the same as dt.in_dim
+  parameterization: "x0"
+  cond_stage_key: unconditional
+  first_stage_config: results/my-encoder_1000/0/ckpt/1999.ckpt
+  cond_stage_config: '__is_unconditional__'
   node_factor: 1.0
   edge_factor: 1.0
-  graph_factor: 1.0
-  task_factor: 1.0
+  graph_factor: 0.0
+  recon_factor: 0.0
+  task_factor: 0.0
+  force_undirected: True
 gt:
   layer_type: GritTransformer
   layers: 10
@@ -194,16 +209,6 @@ gnn: # decoder --> san_graph = MLP + pooling
   dropout: 0.0
   agg: mean
   normalize_adj: False
-posenc_RWSE:
-  enable: False
-  kernel:
-    times_func: range(1,21)
-  model: Linear
-  dim_pe: 28
-  raw_norm_type: BatchNorm
-posenc_RRWP:
-  enable: True
-  ksteps: 20
 optim:
   clip_grad_norm: True
   optimizer: adamW

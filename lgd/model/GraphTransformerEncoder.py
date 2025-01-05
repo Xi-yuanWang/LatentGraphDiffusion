@@ -445,7 +445,9 @@ class GraphTransformerEncoderLayer(nn.Module):
             batch.edge_attr = e
         else:
             batch.edge_attr = e_in1
-
+            
+        # print(f"shape of batch.x in SelfAttentionLayer: {batch.x.shape}")
+        # print(f"shape of batch.edge_attr in SelfAttentionLayer: {batch.edge_attr.shape}")
         return batch
 
     def __repr__(self):
@@ -638,14 +640,18 @@ class GraphTransformerEncoder(nn.Module):
     def forward(self, batch, t=None, prefix=None, label=None, **kwargs):
         # batch.x_0 = batch.x
         # batch.edge_attr_0 = batch.edge_attr
+        # print(f"GTE x type: {batch.x.dtype}")
+        # print(f"GTE edge_attr type: {batch.edge_attr.dtype}")
         num_nodes, num_edges = batch.num_nodes, batch.edge_index.shape[1]
         batch_num_node = batch.num_node_per_graph
         batch_node_idx = num2batch(batch_num_node)
         assert torch.equal(batch_node_idx, batch.batch)
         batch_edge_idx = num2batch(batch_num_node ** 2)
         virtual_node_idx = torch.cumsum(batch_num_node, dim=0) - 1
-        h = self.node_emb(batch.x).reshape(num_nodes, -1)
-        e = self.edge_emb(batch.edge_attr).reshape(num_edges, -1)
+        h = self.node_emb(batch.x).reshape(num_nodes, -1) # 36
+        e = self.edge_emb(batch.edge_attr).reshape(num_edges, -1) # 36
+        # print(f"shape of node emb: {h.shape}")
+        # print(f"shape of edge emb: {e.shape}")
 
         if self.posenc_dim > 0:
             if self.posenc_in_dim > 0 and batch.get("pestat_node", None) is not None:
@@ -716,9 +722,13 @@ class GraphTransformerEncoder(nn.Module):
                 e = e + label_embed_edge
         # else:
         #     label = self.pseudo_label
-
+        
+        # print(f"shape of node_emb before node_in_mlp: {h.shape}")
+        # print(f"shape of edge_emb before edge_in_mlp: {e.shape}")
         h = self.node_in_mlp(h)
         e = self.edge_in_mlp(e)
+        # print(f"shape of node_emb after node_in_mlp: {h.shape}")
+        # print(f"shape of edge_emb after edge_in_mlp: {e.shape}")
         if self.layer_norm:
             h = self.layer_norm_in_h(h)
             e = self.layer_norm_in_e(e)
@@ -728,7 +738,10 @@ class GraphTransformerEncoder(nn.Module):
 
         batch.x = h
         batch.edge_attr = e
-
+        
+        # print(f"shape of x: {batch.x.shape}")
+        # print(f"shape of edge_attr: {batch.edge_attr.shape}")
+        
         if self.use_time and t is not None:
             temb = get_timestep_embedding(t, self.temb_dim)
             temb = self.temb_layer(temb)
@@ -739,7 +752,9 @@ class GraphTransformerEncoder(nn.Module):
 
         for _ in range(self.num_layers):
             batch = self.GTE_layers[_](batch, temb)
-
+            
+        # print(f"shape of x after GTE: {batch.x.shape}")
+        # print(f"shape of edge_attr after GTE: {batch.edge_attr.shape}")
         batch.x = self.final_layer_node(batch.x)
         if self.force_undirected:
             A = to_dense_adj(batch.edge_index, batch.batch, batch.edge_attr)
@@ -751,7 +766,9 @@ class GraphTransformerEncoder(nn.Module):
         if self.final_norm:
             batch.x = self.final_norm_node_1(batch.x)
             batch.edge_attr = self.final_norm_edge_1(batch.edge_attr)
-
+            
+        # print(f"shape of x before out: {batch.x.shape}")
+        # print(f"shape of edge_attr before out: {batch.edge_attr.shape}")
         if self.pool != 'none':
             v_g = self.graph_out_mlp(self.global_pool(batch.x, batch_node_idx))
             if self.final_norm:
@@ -1081,7 +1098,6 @@ class GraphTransformerDecoder(nn.Module):
 
         batch.x = h
         batch.edge_attr = e
-
         if self.use_time and t is not None:
             temb = get_timestep_embedding(t, self.temb_dim)
             temb = self.temb_layer(temb)

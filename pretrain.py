@@ -24,6 +24,7 @@ from torch_geometric.graphgym.train import GraphGymDataModule, train
 from torch_geometric.graphgym.utils.comp_budget import params_count
 from torch_geometric.graphgym.utils.device import auto_select_device
 import lgd.model.GraphTransformerEncoder
+import lgd.model.HOGNNEncoder
 import lgd.train.pretrain_encoder
 import lgd.config.pretrained_config
 import lgd.config.defaults_config

@@ -544,13 +544,13 @@ class DenoisingTransformerLayer(nn.Module):
                 e = self.layer_norm4_e(e)
             if self.batch_norm:
                 e = self.batch_norm4_e(e)
-
         batch.x = h
         if self.update_e:
             batch.edge_attr = e
         else:
             batch.edge_attr = e_in1
-
+        # print(f"shape of batch.x in DenoisingTransformerLayer: {batch.x.shape}")
+        # print(f"shape of batch.edge_attr in DenoisingTransformerLayer: {batch.edge_attr.shape}")
         return batch
 
     def __repr__(self):
@@ -716,15 +716,20 @@ class DenoisingTransformer(nn.Module):
         # batch.x_0 = batch.x
         # batch.edge_attr_0 = batch.edge_attr
         # num_nodes, num_edges = batch.num_nodes, batch.edge_index.shape[1]
-
+        # print(f"DT x type: {batch.x.dtype}")
+        # print(f"DT edge_attr type: {batch.edge_attr.dtype}")
+        
         batch_num_node = batch.num_node_per_graph
         batch_node_idx = num2batch(batch_num_node)
         assert torch.equal(batch_node_idx, batch.batch)
         batch_edge_idx = num2batch(batch_num_node ** 2)
         batch.batch_node_idx, batch.batch_edge_idx = batch_node_idx, batch_edge_idx
-
+        # print(f"shape of node: {batch.x.shape}")
+        # print(f"shape of edge: {batch.edge_attr.shape}")
         h = self.node_in_mlp(batch.x)
         e = self.edge_in_mlp(batch.edge_attr)
+        # print(f"shape of node after in_mlp: {h.shape}")
+        # print(f"shape of edge after in_mlp: {e.shape}")
         if 'masked_graph' in self.condition_list:  # TODO: prompt_graph, how to process? the hidden_dim are different too
             prompt_h0, prompt_e0, prompt_g0 = prompt
             prompt_h = self.cond_in_mlp(prompt_h0)
@@ -753,7 +758,9 @@ class DenoisingTransformer(nn.Module):
             temb = (temb_h, temb_e)
         else:
             temb = None
-
+            
+        # print(f"shape of x before DT: {batch.x.shape}")
+        # print(f"shape of edge_attr before DT: {batch.edge_attr.shape}")
         for _ in range(self.num_layers):
             # logging.info(_)
             batch = self.denoising_layers[_](batch, temb, prompt)
@@ -765,7 +772,9 @@ class DenoisingTransformer(nn.Module):
                 # isnan = torch.isnan(batch.x).any() or torch.isnan(batch.edge_attr).any()
                 # if isnan:
                 #     logging.info('sa')
-
+                
+        # print(f"shape of x after DT: {batch.x.shape}")
+        # print(f"shape of edge_attr after DT: {batch.edge_attr.shape}")
         batch.x = self.final_layer_node(batch.x)
         # logging.info(torch.isnan(batch.x).any())
         if self.force_undirected:
@@ -779,7 +788,8 @@ class DenoisingTransformer(nn.Module):
         if self.final_norm:
             batch.x = self.final_norm_node_1(batch.x)
             batch.edge_attr = self.final_norm_edge_1(batch.edge_attr)
-
+        # print(f"shape of x before out: {batch.x.shape}")
+        # print(f"shape of edge_attr before out: {batch.edge_attr.shape}")
         virtual_node_idx = torch.cumsum(batch.num_node_per_graph, dim=0) - 1
         if self.pool != 'none':
             v_g = self.graph_out_mlp(self.global_pool(batch.x, batch_node_idx))
