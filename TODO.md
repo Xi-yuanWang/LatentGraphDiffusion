@@ -39,3 +39,29 @@ DenoisingHOGNN
 2. 给HOGNNEncoder和DenoisingHOGNN都加了in_mlp和final_mlp，其中前者还有node和edge embedding层，posenc是没有的，后续可以考虑加上。在已经有embedding层的情况下，in_mlp不一定有用（如果没有posenc），先加上了。这样可以保证内部计算使用较大的64维向量，最后输出前映射成4。
 3. 为什么train diffusion的时候保存的ckpt特别少？？？-> val和test loss都是单调递增的，为什么？？？
 my encoder也有类似的问题，不过好像不是单调递增，而是从一个比较小
+
+train好的：
+my encoder 1000
+my encoder 100
+hognn encoder 100 (ppgn)
+ngnn encoder 100
+ngnn ddpm 100
+ngnn ddpm
+hognn ddpm 100
+ngnn encoder 100 new (in tmux ngnn_encoder_100)
+hognn encoder 100 new (ppgn) (in tmux hognn_encoder_100)
+ngnn encoder
+正在train的：(理论上hognn后面没加后缀的都是1000，可以自己check)
+hognn encoder (ppgn)
+hognn diffusion 100 (ppgn)
+hognn diffusion 100 (ppgn) new
+ngnn diffusion
+ngnn diffusion 100
+ngnn diffusion 100 new
+ngnn encoder new (in tmux ngnn_encoder_new)
+
+Some instructions on the new cfgs:
+...complex means trained on the Complex Six Cycle dataset, otherwise means on the Six Cycle dataset
+...old and ...new (correspond to HOGNN and HOGNN++ in the report): old encoders do not have dropout, batchnorm, and force undirected; old denoising networks do not have batchnorm and force undirected
+...old和...new是相对的，如果有一类模型的cfg有...old，那么对应的无附注的cfg就是...new的模型结构；如果有一类模型的cfg有...new，那么对应的无附注的cfg就是...old的模型结构
+...fast has the same model structure as ...old, but are trained with the improved version of the edge_attr extraction operation (faster)

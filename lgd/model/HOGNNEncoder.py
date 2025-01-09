@@ -83,11 +83,15 @@ class HOGNNEncoder(nn.Module):
         self.in_dim = cfg.in_dim
         self.hid_dim = cfg.hid_dim
         self.out_dim = cfg.out_dim
+        self.layer_norm = cfg.layer_norm
+        self.batch_norm = cfg.batch_norm
         self.posenc_in_dim = cfg.posenc_in_dim
         self.posenc_in_dim_edge = cfg.posenc_in_dim_edge
         self.posenc_dim = cfg.posenc_dim
         self.subgnn_type = cfg.subgnn.type
         self.act = act_dict[cfg.act]() if cfg.act is not None else nn.Identity()
+        self.bn_momentum = cfg.bn_momentum
+        self.bn_no_runner = cfg.bn_no_runner
         
         self.temb = nn.Sequential(nn.Linear(1, self.hid_dim), nn.SiLU(inplace=True), nn.Linear(self.hid_dim, self.hid_dim), nn.SiLU(inplace=True))
 
@@ -134,11 +138,43 @@ class HOGNNEncoder(nn.Module):
         self.edge_in_mlp = nn.Sequential(nn.Linear(self.hid_dim, 2 * self.hid_dim), self.act,
                                          nn.Linear(2 * self.hid_dim, self.hid_dim))
         
+        # if self.layer_norm:
+        #     self.layer_norm_in_h = nn.LayerNorm(self.hid_dim)
+        #     self.layer_norm_in_e = nn.LayerNorm(self.hid_dim) if cfg.norm_e else nn.Identity()
+
+        # if self.batch_norm:
+        #     # when the batch_size is really small, use smaller momentum to avoid bad mini-batch leading to extremely bad val/test loss (NaN)
+        #     self.batch_norm_in_h = nn.BatchNorm1d(self.hid_dim, track_running_stats=not self.bn_no_runner, eps=1e-5,
+        #                                           momentum=self.bn_momentum)
+        #     self.batch_norm_in_e = nn.BatchNorm1d(self.hid_dim, track_running_stats=not self.bn_no_runner, eps=1e-5,
+        #                                           momentum=self.bn_momentum) if cfg.norm_e else nn.Identity()
+            
         self.final_layer_node = nn.Sequential(nn.Linear(self.hid_dim, 2 * self.out_dim), self.act,
                                               nn.Linear(2 * self.out_dim, self.out_dim))
         self.final_layer_edge = nn.Sequential(nn.Linear(self.hid_dim, 2 * self.out_dim), self.act,
                                               nn.Linear(2 * self.out_dim, self.out_dim))
-        
+        self.force_undirected = cfg.get("force_undirected", False)
+        self.final_norm = cfg.get('final_norm', False)
+        if self.final_norm:
+            self.final_norm_node_1 = nn.LayerNorm(self.out_dim)
+            self.final_norm_edge_1 = nn.LayerNorm(self.out_dim)
+        assert cfg.pool in ['max', 'add', 'mean', 'none']
+        self.pool = cfg.pool
+        self.pool_vn = cfg.get('pool_vn', False)
+        self.pool_edge = cfg.get('pool_edge', False)
+        self.post_pool = cfg.get('post_pool', False)
+        if self.pool != 'none':
+            self.global_pool = eval("global_" + self.pool + "_pool")
+            self.graph_out_mlp = nn.Sequential(nn.Linear(self.out_dim, 2 * self.out_dim), self.act,
+                                               nn.Linear(2 * self.out_dim, self.out_dim)) if self.post_pool else nn.Identity()
+            if self.final_norm:
+                self.final_norm_node_2 = nn.LayerNorm(self.out_dim)
+            if self.pool_edge:
+                self.graph_out_mlp_2 = nn.Sequential(nn.Linear(self.out_dim, 2 * self.out_dim), self.act,
+                                                     nn.Linear(2 * self.out_dim, self.out_dim)) if self.post_pool else nn.Identity()
+                if self.final_norm:
+                    self.final_norm_edge_2 = nn.LayerNorm(self.out_dim)
+                    
         self.decode_node = nn.Linear(self.out_dim, self.node_dict_dim)  # virtual node
         self.decode_edge = nn.Linear(self.out_dim, self.edge_dict_dim)  # no edge, virtual edge, loop
         self.decode_graph = nn.Linear(self.out_dim, self.decode_dim)
@@ -175,7 +211,13 @@ class HOGNNEncoder(nn.Module):
         
         h = self.node_in_mlp(h) # 64 -> 64
         e = self.edge_in_mlp(e) # 64 -> 64
-        
+        # if self.layer_norm:
+        #     h = self.layer_norm_in_h(h)
+        #     e = self.layer_norm_in_e(e)
+        # if self.batch_norm:
+        #     h = self.batch_norm_in_h(h)
+        #     e = self.batch_norm_in_e(e)
+            
         # print(f"GRAPH ATTRIBUTE AT THE BEGINNING: {batch.graph_attr}")
         x, mask = to_dense_batch(h, batch.batch) # mask是一个num_graphs(B)×num_nodes_per_graph(N)的矩阵，如果x里面有些node_representation是pooling的结果，这些位置就会在mask中被标记为False，表示占位值
         adj = to_dense_adj(batch.edge_index, batch.batch, e)
@@ -193,18 +235,54 @@ class HOGNNEncoder(nn.Module):
 
         X = X + X.transpose(1, 2)
         
-        e = torch.empty(e.shape).to("cuda")
-        for edge_idx in range(batch.edge_index.shape[1]):
-            from_node = batch.edge_index[0][edge_idx]
-            to_node = batch.edge_index[1][edge_idx]
-            from_node_idx = from_node - get_first_node(batch, batch.batch[from_node])
-            to_node_idx = to_node - get_first_node(batch, batch.batch[to_node])
-            e[edge_idx] = X[batch.batch[from_node]][from_node_idx][to_node_idx] # 这里index batch用的index应该用from_node和to_node都行
+        ei = batch.edge_index
+        num_graph = mask.to(torch.long).sum(dim=-1)
+        firstnode = torch.cumsum(num_graph, dim=0) - num_graph
+        eibatch = batch.batch[ei[0]]
+        e = X[eibatch, ei[0] - firstnode[eibatch], ei[1] - firstnode[eibatch]]
+        
+        # e = torch.empty(e.shape).to(batch.x.device)
+        # for edge_idx in range(batch.edge_index.shape[1]):
+        #     from_node = batch.edge_index[0][edge_idx]
+        #     to_node = batch.edge_index[1][edge_idx]
+        #     from_node_idx = from_node - get_first_node(batch, batch.batch[from_node])
+        #     to_node_idx = to_node - get_first_node(batch, batch.batch[to_node])
+        #     e[edge_idx] = X[batch.batch[from_node]][from_node_idx][to_node_idx] # 这里index batch用的index应该用from_node和to_node都行
             
         h = self.mlp(X).mean(dim=-2)[mask] # (B, N, N, d) -> (B, N, d)
-        batch.x = self.final_layer_node(h)
-        batch.edge_attr = self.final_layer_node(e)
-        batch.graph_attr = global_mean_pool(batch.x, batch.batch)
+        batch.x = h
+        batch.edge_attr = e
+        batch.x = self.final_layer_node(batch.x)
+        # if self.force_undirected:
+        #     print("USING FORCE UNDIRECTED")
+        #     A = to_dense_adj(batch.edge_index, batch.batch, batch.edge_attr)
+        #     A = (A + A.permute(0, 2, 1, 3)).reshape(-1, A.shape[-1])
+        #     mask = A.any(dim=1)
+        #     batch.edge_attr = A[mask]
+        #     assert batch.edge_attr.shape[0] == batch.edge_index.shape[1]
+        batch.edge_attr = self.final_layer_node(batch.edge_attr)
+        
+        if self.final_norm:
+            batch.x = self.final_norm_node_1(batch.x)
+            batch.edge_attr = self.final_norm_edge_1(batch.edge_attr)
+
+        if self.pool != 'none':
+            v_g = self.graph_out_mlp(self.global_pool(batch.x, batch_node_idx))
+            if self.final_norm:
+                v_g = self.final_norm_node_2(v_g)
+            if self.pool_vn:
+                pass
+            if self.pool_edge:
+                v_e = self.graph_out_mlp_2(self.global_pool(batch.edge_attr, batch_edge_idx))
+                if self.final_norm:
+                    v_e = self.final_norm_edge_2(v_e)
+                v_g = v_g + v_e
+            # Do we need to change the virtual nodes in batch.x? used for classification loss
+            # batch.x[virtual_node_idx] = v_g
+        else:
+            v_g = global_mean_pool(batch.x, batch.batch)
+        batch.graph_attr = v_g
+        # batch.graph_attr = global_mean_pool(batch.x, batch.batch)
         # print(f"graph_attr.shape: {batch.graph_attr.shape}")
         return batch
     

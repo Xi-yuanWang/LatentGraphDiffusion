@@ -1,4 +1,3 @@
-# Original:  zinc-encoder.yaml
 out_dir: results
 metric_best: mae
 metric_agg: argmin
@@ -6,15 +5,16 @@ tensorboard_each_run: False  # Log to Tensorboard each run
 #accelerator: "cuda:3"
 #device: "cuda:3"
 accelerator: "cuda:0"
+device: "cuda:0"
 mlflow:
   use: False
   project: Exp
   name: mydata-GRIT-RRWP
 wandb:
   use: False
-  project: six_cycle_128
+  project: mydata
 dataset:
-  format: PyG-mydata1000
+  format: PyG-mydatacomplex
   name: subset
   task: graph
   task_type: regression
@@ -29,13 +29,16 @@ dataset:
   edge_encoder_bn: False
   add_virtual_node_edge: False
   subgraph: False
+  remove_h: False
 train:
-  mode: pretrain_encoder
-  batch_size: 128
-  eval_period: 5
+  mode: qm9_unconditional
+  batch_size: 64
+  eval_batch_size: 2048
+  eval_period: 1
+  start_eval_epoch: -1
   enable_ckpt: True  # Checkpointing can now be disabled to save I/O when e.g. just benchmarking.
   ckpt_best: False  # WARNING: Checkpoint every epoch a better model is found may increase I/O significantly.
-  ckpt_clean: False # Do not delete old ckpt each time.
+  ckpt_clean: False # Delete old ckpt each time.
   ckpt_period: 25
   ensemble_repeat: 1
   ensemble_mode: none
@@ -50,10 +53,11 @@ train:
     edge_factor: 1.0
     graph_factor: 0.0
 model:
-  type: HOGNNEncoder
+  type: LatentDiffusion
   loss_fun: l1
   edge_decoding: dot
   graph_pooling: add
+  diffusion_model: DenoisingHOGNN
 posenc_RRWP:
   enable: True
   ksteps: 16
@@ -125,6 +129,81 @@ encoder:
     type: 'PPGN'
     num_layers: 6
     c_hid: 4
+hognn:
+  in_dim: 32  # should be the same as encoder.out_dim
+  hid_dim: 256
+  out_dim: 32
+  num_layers: 6
+  act: 'relu'
+  type: 'PPGN'
+  dropout: 0.2
+  force_undirected: True
+  pool: mean
+  pool_edge: True
+  pool_vn: False
+  post_pool: False
+  final_norm: True
+  layer_norm: False
+  batch_norm: True
+  bn_momentum: 0.1
+  bn_no_runner: False
+  norm_e: True
+dt:
+  in_dim: 32  # should be the same as encoder.out_dim
+  hid_dim: 256
+  out_dim: 32
+  use_time: True
+  temb_dim: 128
+  cond_dim: 16
+  num_heads: 16
+  num_layers: 8
+  self_attn: True
+  dropout: 0.05
+  attn_dropout: 0.1
+  residual: True
+  layer_norm: False
+  batch_norm: True
+  act: 'relu'
+  attn:
+    clamp: 5.
+    act: 'relu'
+    full_attn: True
+    edge_enhance: True
+    O_e: True
+    norm_e: True
+    fwl: False
+    signed_sqrt: True
+    score_act: True
+    deg_scaler: False
+    attn_product: mul
+    attn_reweight: False
+    edge_reweight: False
+  norm_e: True
+  O_e: True
+  ff_e: True
+  ff_e_ca: True
+  ff_e_sa: True
+  update_e: True
+  force_undirected: True
+  pool: mean
+  pool_edge: True
+  pool_vn: False
+  post_pool: False
+  final_norm: True
+  condition_list: ['unconditional']
+diffusion:
+  conditioning_key: crossattn
+  hid_dim: 32  # should be the same as dt.in_dim
+  parameterization: "x0"
+  cond_stage_key: unconditional
+  first_stage_config: results/ppgn-encoder_100_complex/3/ckpt/1999.ckpt
+  cond_stage_config: '__is_unconditional__'
+  node_factor: 1.0
+  edge_factor: 1.0
+  graph_factor: 0.0
+  recon_factor: 0.0
+  task_factor: 0.0
+  force_undirected: True
 gt:
   layer_type: GritTransformer
   layers: 10
@@ -154,21 +233,11 @@ gnn: # decoder --> san_graph = MLP + pooling
   dropout: 0.0
   agg: mean
   normalize_adj: False
-posenc_RWSE:
-  enable: False
-  kernel:
-    times_func: range(1,21)
-  model: Linear
-  dim_pe: 28
-  raw_norm_type: BatchNorm
-posenc_RRWP:
-  enable: False
-  ksteps: 20
 optim:
   clip_grad_norm: True
   optimizer: adamW
   weight_decay: 1e-5
-  base_lr: 1e-3
+  base_lr: 1e-4
   max_epoch: 2000
   num_warmup_epochs: 50
   scheduler: cosine_with_warmup

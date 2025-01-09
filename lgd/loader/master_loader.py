@@ -197,6 +197,11 @@ def load_dataset_master(format, name, dataset_dir):
             from lgd.loader.newdataset import preformat_mydata1000
             dataset = preformat_mydata1000(dataset_dir, name)
             print(f"Loading dataset {pyg_dataset_id}, with length {len(dataset)}")
+        
+        elif pyg_dataset_id == 'mydatacomplex':
+            from lgd.loader.newdataset import preformat_mydatacomplex
+            dataset = preformat_mydatacomplex(dataset_dir, name)
+            print(f"Loading dataset {pyg_dataset_id}, with length {len(dataset)}")
             
         elif pyg_dataset_id == 'AQSOL':
             dataset = preformat_AQSOL(dataset_dir, name)

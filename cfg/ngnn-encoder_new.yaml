@@ -5,7 +5,8 @@ metric_agg: argmin
 tensorboard_each_run: False  # Log to Tensorboard each run
 #accelerator: "cuda:3"
 #device: "cuda:3"
-accelerator: "cuda:0"
+accelerator: "cuda:1"
+device: "cuda:1"
 mlflow:
   use: False
   project: Exp
@@ -122,7 +123,7 @@ encoder:
   edge_encoder_bn: False
   add_virtual_node_edge: False
   subgnn:
-    type: 'PPGN'
+    type: 'NGNN'
     num_layers: 6
     c_hid: 4
 gt:

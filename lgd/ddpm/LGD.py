@@ -29,8 +29,8 @@ from lgd.model.Dictionary import *
 from lgd.model.GraphTransformerEncoder import *
 from lgd.model.SyntheticGraphTransformerEncoder import *
 from lgd.model.DenoisingTransformer import DenoisingTransformer
-
 from lgd.model.DenoisingHOGNN import DenoisingHOGNN
+from lgd.model.HOGNNEncoder import HOGNNEncoder
 
 
 def disabled_train(self, mode=True):

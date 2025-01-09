@@ -5,7 +5,8 @@ metric_agg: argmin
 tensorboard_each_run: False  # Log to Tensorboard each run
 #accelerator: "cuda:3"
 #device: "cuda:3"
-accelerator: "cuda:0"
+accelerator: "cuda:3"
+device: "cuda:3"
 mlflow:
   use: False
   project: Exp
@@ -14,7 +15,7 @@ wandb:
   use: False
   project: six_cycle_128
 dataset:
-  format: PyG-mydata1000
+  format: PyG-mydata
   name: subset
   task: graph
   task_type: regression
@@ -31,7 +32,7 @@ dataset:
   subgraph: False
 train:
   mode: pretrain_encoder
-  batch_size: 128
+  batch_size: 64
   eval_period: 5
   enable_ckpt: True  # Checkpointing can now be disabled to save I/O when e.g. just benchmarking.
   ckpt_best: False  # WARNING: Checkpoint every epoch a better model is found may increase I/O significantly.

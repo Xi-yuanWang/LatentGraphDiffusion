@@ -104,6 +104,42 @@ class SixCycle1000Dataset(InMemoryDataset):
 
         self.save(data_list, self.processed_paths[0])
 
+class SixCycleComplexDataset(InMemoryDataset):
+    # root -> path to your dataset
+    def __init__(self, root: str = "datasets/six_cycle_complex", transform: Callable[..., Any] | None = None, pre_transform: Callable[..., Any] | None = None, pre_filter: Callable[..., Any] | None = None, log: bool = True, force_reload: bool = False) -> None:
+        super().__init__(root, transform, pre_transform, pre_filter, log, force_reload)
+        self.load(self.processed_paths[0])
+        
+    @property
+    def raw_file_names(self):
+        # will produce raw_paths
+        return ['complex_six_cycle.pkl']
+
+    @property
+    def processed_file_names(self):
+        return ['data.pt']
+
+    def download(self):
+        # download_url(url, self.raw_dir) # no need for local data
+        pass
+
+    def process(self):
+        with open(self.raw_paths[0], "rb") as f:
+            graphlist = pickle.load(f)
+        data_list = [from_networkx(_) for _ in graphlist]
+        for data in data_list:
+            data.x = torch.ones((data.num_nodes, 1), dtype=torch.long)
+            data.edge_attr = torch.ones((data.edge_index.shape[1]), dtype=torch.long)
+            data.y = torch.ones((1,), dtype=torch.float)
+
+        if self.pre_filter is not None:
+            data_list = [data for data in data_list if self.pre_filter(data)]
+
+        if self.pre_transform is not None:
+            data_list = [self.pre_transform(data) for data in data_list]
+
+        self.save(data_list, self.processed_paths[0])
+        
 class MyDataset(InMemoryDataset):
     # root -> path to your dataset
     def __init__(self, root: str = "datasets/mydata", transform: Callable[..., Any] | None = None, pre_transform: Callable[..., Any] | None = None, pre_filter: Callable[..., Any] | None = None, log: bool = True, force_reload: bool = False) -> None:
@@ -142,6 +178,11 @@ class MyDataset(InMemoryDataset):
 
 def preformat_mydata(dataset_dir, name):
     dataset = MyDataset()
+    ret = join_dataset_splits([dataset[:80], dataset[80:90], dataset[90:]])
+    return ret
+
+def preformat_mydatacomplex(dataset_dir, name):
+    dataset = SixCycleComplexDataset()
     ret = join_dataset_splits([dataset[:80], dataset[80:90], dataset[90:]])
     return ret
 
